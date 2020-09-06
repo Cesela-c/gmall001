@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="en" xmlns="http://www.w3.org/1999/xhtml" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+</head>
+<body>
+<h2 th:text="${data}">fsdafsdfasdfasdfas</h2><br>
+<h2 th:each="str:${list}" th:text ="${str}"></h2><br>
+<input type="checkbox" th:checked="${check} == '1   '"/>
+
+<a th:href="'javascript:abc(\''+${data}+'\')'">点这里</a>
+<script type="text/javascript" th:inline="javascript">
+    function abc(say) {
+        alert(say);
+    }
+/*    alert("thymeleaf script 启动");
+    alert([[${data}]]);*/
+</script>
+</body>
+</html>

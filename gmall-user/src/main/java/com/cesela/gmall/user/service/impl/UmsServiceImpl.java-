@@ -1,0 +1,91 @@
+package com.cesela.gmall.user.service.impl;
+
+
+
+import com.alibaba.fastjson.JSON;
+import com.cesela.gmall.bean.UmsMember;
+import com.cesela.gmall.bean.UmsMemberReceiveAddress;
+import com.cesela.gmall.service.UmsService;
+import com.cesela.gmall.user.mapper.UmsMapper;
+import com.cesela.gmall.user.mapper.UmsMemberReceiveAddressMapper;
+import com.cesela.gmall.util.RedisUtil;
+import org.apache.commons.lang3.StringUtils;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+import redis.clients.jedis.Jedis;
+
+import java.util.List;
+
+/**
+ * @Date:2020/6/27 9:53
+ */
+@Service
+public class UmsServiceImpl implements UmsService {
+
+    @Autowired
+    private UmsMapper umsMapper;
+
+    @Autowired
+    private UmsMemberReceiveAddressMapper umsMemberReceiveAddressMapper;
+
+    @Autowired
+    RedisUtil redisUtil;
+
+    @Override
+    public List<UmsMember> getAllUser() {
+
+        /*List<UmsMember> umsMemberList = umsMapper.selectAllUser();*/
+        List<UmsMember> umsMemberList = umsMapper.selectAllUser(); //通用mapper方法
+
+        return umsMemberList;
+    }
+
+    @Override
+    public List<UmsMemberReceiveAddress> getReceiveAddressBtMemberId(Long memberId) {
+
+        /*Example e = new Example(UmsMemberReceiveAddress.class);
+        e.createCriteria().andEqualTo("memberId", memberId);
+        List<UmsMemberReceiveAddress> umsMemberReceiveAddressList = umsMemberReceiveAddressMapper.selectByExample(e);*/
+
+        UmsMemberReceiveAddress umsMemberReceiveAddress = new UmsMemberReceiveAddress();
+        umsMemberReceiveAddress.setMemberId(memberId);
+        List<UmsMemberReceiveAddress> umsMemberReceiveAddressList = umsMemberReceiveAddressMapper.select(umsMemberReceiveAddress);
+
+        return umsMemberReceiveAddressList;
+    }
+
+    @Override
+    public UmsMember login(UmsMember umsMember) {
+        Jedis jedis = null;
+
+        //设计 redis
+        try {
+            jedis = redisUtil.getJedis();
+            if (jedis != null) {
+                String umsMemberStr = jedis.get("user:" + umsMember.getPassword() + ":info");
+                if (StringUtils.isNotBlank(umsMemberStr)) {
+                    //密码正确
+                    UmsMember umsMemberFromCache = JSON.parseObject(umsMemberStr, UmsMember.class);
+                    return umsMemberFromCache;
+                }
+            }
+            //链接redis失败,开启数据库
+            UmsMember umsMemberFromDb = loginFromDb(umsMember);
+            if (umsMemberFromDb != null) {
+                jedis.setex("user:" + umsMember.getPassword() + ":info", 60 * 60 * 24, JSON.toJSONString(umsMemberFromDb));
+            }
+            return umsMemberFromDb;
+        } finally {
+            jedis.close();
+        }
+    }
+
+    private UmsMember loginFromDb(UmsMember umsMember) {
+
+        List<UmsMember> umsMembers = umsMapper.select(umsMember);
+        if (umsMembers != null) {
+            return umsMembers.get(0);
+        }
+        return null;
+    }
+}
